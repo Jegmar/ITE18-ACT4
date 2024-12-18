@@ -100,8 +100,8 @@ new GLTFLoader().load(
   'https://trystan211.github.io/ite18_act4_n/cactus_1_downloadable.glb',  
   (gltf) => {
         centralModel = gltf.scene;
-        centralModel.position.set(0, 1, 0);
-        centralModel.scale.set(1, 1, 1);
+        centralModel.position.set(0, 0, 0);
+        centralModel.scale.set(2, 2, 2);
         scene.add(centralModel);
         console.log("Model Loaded:", gltf.scene);
     },
