@@ -2,163 +2,191 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.m
 import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/loaders/GLTFLoader.js";
 
-// Scene Setup ni
+// === Basic Scene Setup ===
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xffcc99); // Para sa warm desert tone
-scene.fog = new THREE.Fog(0xffcc99, 20, 150); // Desert fog para nindot
 
-// Renderer Setup ni diri
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
 document.body.appendChild(renderer.domElement);
 
-// Camera Setup ni diri
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.set(0, 15, 40);
+camera.position.set(0, 5, 30);
 scene.add(camera);
 
-// Orbit Controls ni
-const controls = new OrbitControls(camera, renderer.domElement);
+// === Orbit Controls ===
+new OrbitControls(camera, renderer.domElement);
 
-// Sunlight
-const sunLight = new THREE.PointLight(0xffaa00, 4, 200);
-sunLight.position.set(20, 50, 20);
-scene.add(sunLight);
+// === Lighting ===
+const ambientLight = new THREE.AmbientLight(0x404040, 1.5);
+scene.add(ambientLight);
 
-// Ground geometry (Sand dunes kibali)
-const groundGeometry = new THREE.PlaneGeometry(200, 200, 300, 300);
-groundGeometry.rotateX(-Math.PI / 2);
+const movingLight = new THREE.PointLight(0x8a2be2, 2, 50);
+movingLight.position.set(10, 10, 10);
+scene.add(movingLight);
 
-// Ground shader ni diri bai
-const groundMaterial = new THREE.ShaderMaterial({
-    uniforms: {
-        time: { value: 0 },
-        duneHeight: { value: 2.0 },
-        duneFrequency: { value: 0.3 },
-        sandColor: { value: new THREE.Color(0xf4a460) }, // Sand color
-        sunPosition: { value: new THREE.Vector3(20, 50, 20) },
-    },
-    vertexShader: `
-        uniform float time;
-        uniform float duneHeight;
-        uniform float duneFrequency;
-        varying vec2 vUv;
-
-        void main() {
-            vUv = uv;
-            vec3 pos = position;
-
-            // Create rolling sand dunes
-            pos.y += sin(pos.x * duneFrequency + time) * duneHeight * 0.7;
-            pos.y += cos(pos.z * duneFrequency * 1.5 + time) * duneHeight * 0.5;
-
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-        }
-    `,
-    fragmentShader: `
-        uniform vec3 sandColor;
-        uniform vec3 sunPosition;
-        varying vec2 vUv;
-
-        void main() {
-            float brightness = dot(normalize(sunPosition), vec3(0, 1, 0)) * 0.5 + 0.5; // Simulated sunlight
-            vec3 finalColor = sandColor * brightness;
-            gl_FragColor = vec4(finalColor, 1.0);
-        }
-    `,
-    side: THREE.DoubleSide,
+// === Crystals ===
+const crystalMaterial = new THREE.MeshPhongMaterial({
+    color: 0x7fffd4,
+    emissive: 0x7fffd4,
+    emissiveIntensity: 0.6,
+    transparent: true,
+    opacity: 0.9,
+    shininess: 100,
 });
 
-// Add sa ground mesh
-const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-scene.add(ground);
+function createCrystal(position) {
+    const geometry = new THREE.ConeGeometry(1, 3, 8);
+    const crystal = new THREE.Mesh(geometry, crystalMaterial);
+    crystal.position.set(...position);
+    scene.add(crystal);
+}
 
-// Load sa cactus model
-const loader = new GLTFLoader();
-let cactus = null;
+// Generate Random Crystals
+for (let i = 0; i < 30; i++) {
+    createCrystal([
+        (Math.random() - 0.5) * 50,
+        Math.random() * 5,
+        (Math.random() - 0.5) * 50,
+    ]);
+}
 
-loader.load(
-    'https://trystan211.github.io/ite18_act4_n/cactus_1_downloadable.glb', 
-    (gltf) => {
-        cactus = gltf.scene;
-        cactus.position.set(0, 0, 0);
-        cactus.scale.set(2, 2, 2);
-        scene.add(cactus);
+// === Shimmering Lake ===
+const lake = (() => {
+    const geometry = new THREE.PlaneGeometry(100, 100, 200, 200);
+    geometry.rotateX(-Math.PI / 2);
+
+    const material = new THREE.ShaderMaterial({
+        uniforms: {
+            time: { value: 0 },
+            baseColor: { value: new THREE.Color(0x1e90ff) },
+            highlightColor: { value: new THREE.Color(0x87cefa) },
+        },
+        vertexShader: `
+            uniform float time;
+            varying vec2 vUv;
+            varying float vWave;
+
+            void main() {
+                vUv = uv;
+                vec3 pos = position;
+                vWave = sin(pos.x * 0.2 + time) * 0.3 + cos(pos.z * 0.2 + time * 1.5) * 0.3;
+                pos.y += vWave;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+            }
+        `,
+        fragmentShader: `
+            uniform vec3 baseColor;
+            uniform vec3 highlightColor;
+            varying vec2 vUv;
+            varying float vWave;
+
+            void main() {
+                float intensity = vWave * 0.5 + 0.5;
+                vec3 color = mix(baseColor, highlightColor, intensity);
+                gl_FragColor = vec4(color, 1.0);
+            }
+        `,
+        side: THREE.DoubleSide,
+    });
+
+    return new THREE.Mesh(geometry, material);
+})();
+scene.add(lake);
+
+// === Model ===
+let centralModel = null;
+new GLTFLoader().load(
+  'https://Jegmar.github.io/ITE18_ACT4/thai_water_buffalo_vessel_c._1000_bce.glb', 
+  (gltf) => {
+        centralModel = gltf.scene;
+        centralModel.position.set(0, 1, 0);
+        centralModel.scale.set(150, 150, 150);
+        scene.add(centralModel);
+        console.log("Model Loaded:", gltf.scene);
     },
     undefined,
-    (error) => {
-        console.error("Error loading the cactus model:", error);
-    }
+    (error) => console.error("Failed to load model:", error)
 );
 
-// Sandstorm geometry ni diri
-const sandCount = 10000;
-const sandGeometry = new THREE.BufferGeometry();
-const sandPositions = [];
-const sandVelocities = [];
+// === Orbiting Particles ===
+const particles = (() => {
+    const particleCount = 5000;
+    const positions = new Float32Array(particleCount * 3);
+    const speeds = new Float32Array(particleCount);
 
-for (let i = 0; i < sandCount; i++) {
-    const x = (Math.random() - 0.5) * 200;
-    const y = Math.random() * 50;
-    const z = (Math.random() - 0.5) * 200;
-    sandPositions.push(x, y, z);
-    sandVelocities.push(-0.1 - Math.random() * 0.3); // Sandstorm movement para murag nag dagan
-}
-
-sandGeometry.setAttribute("position", new THREE.Float32BufferAttribute(sandPositions, 3));
-
-// Sandstorm material ni diri
-const sandMaterial = new THREE.PointsMaterial({
-    color: 0xd2b48c, // Sandy color ni na code
-    size: 0.4,
-    transparent: true,
-    opacity: 0.7,
-});
-
-// Pag add sa sandstorm particles ni
-const sandstorm = new THREE.Points(sandGeometry, sandMaterial);
-scene.add(sandstorm);
-
-// Animation na loop
-const clock = new THREE.Clock();
-function animate() {
-    const elapsedTime = clock.getElapsedTime();
-
-    // Update sa ground
-    groundMaterial.uniforms.time.value = elapsedTime;
-
-    // Update sa sandstorm
-    const positions = sandstorm.geometry.attributes.position.array;
-    for (let i = 0; i < sandCount; i++) {
-        positions[i * 3 + 1] += sandVelocities[i]; // Y-axis na lihok para sa falling effect
-        if (positions[i * 3 + 1] < 0) {
-            positions[i * 3 + 1] = 50; // Reset sa sand particle
-        }
+    for (let i = 0; i < particleCount; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const distance = 10 + Math.random() * 10;
+        positions[i * 3] = Math.cos(angle) * distance; // x
+        positions[i * 3 + 1] = Math.random() * 5 - 2.5; // y
+        positions[i * 3 + 2] = Math.sin(angle) * distance; // z
+        speeds[i] = 0.001 + Math.random() * 0.002;
     }
-    sandstorm.geometry.attributes.position.needsUpdate = true;
 
-    // Moving sunlight ni (kanang bright orange)
-    sunLight.position.set(
-        20 * Math.sin(elapsedTime * 0.2),
-        50,
-        20 * Math.cos(elapsedTime * 0.2)
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute("speed", new THREE.Float32BufferAttribute(speeds, 1));
+
+    const material = new THREE.PointsMaterial({
+        color: 0x87cefa,
+        size: 0.2,
+        transparent: true,
+        opacity: 0.9,
+    });
+
+    const points = new THREE.Points(geometry, material);
+    return points;
+})();
+scene.add(particles);
+
+// === Animation ===
+const clock = new THREE.Clock();
+
+function animate() {
+    const delta = clock.getDelta();
+    const time = clock.getElapsedTime();
+
+    // Update lake shader
+    lake.material.uniforms.time.value = time;
+
+    // Update particles
+    const particlePositions = particles.geometry.attributes.position.array;
+    const particleSpeeds = particles.geometry.attributes.speed.array;
+
+    for (let i = 0; i < particlePositions.length / 3; i++) {
+        const angle = Math.atan2(particlePositions[i * 3 + 2], particlePositions[i * 3]);
+        const distance = Math.sqrt(
+            particlePositions[i * 3] ** 2 + particlePositions[i * 3 + 2] ** 2
+        );
+
+        const speed = particleSpeeds[i];
+        const newAngle = angle + speed;
+
+        particlePositions[i * 3] = Math.cos(newAngle) * distance;
+        particlePositions[i * 3 + 2] = Math.sin(newAngle) * distance;
+    }
+    particles.geometry.attributes.position.needsUpdate = true;
+
+    // Update moving light
+    movingLight.position.set(
+        10 * Math.sin(time * 0.5),
+        10,
+        10 * Math.cos(time * 0.5)
     );
 
-    // Para mu sway ang cactus 
-    if (cactus) {
-    cactus.rotation.z = Math.sin(elapsedTime * 0.5) * 0.08; // Increased frequency (0.5) og ang amplitude (0.5)
-}
-
-    // Render sa scene
     renderer.render(scene, camera);
     requestAnimationFrame(animate);
 }
 
 animate();
 
-
+// === Responsive Resizing ===
 window.addEventListener("resize", () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
