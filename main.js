@@ -97,7 +97,7 @@ scene.add(lake);
 // === Model ===
 let centralModel = null;
 new GLTFLoader().load(
-  'https://Jegmar.github.io/ITE18_ACT4/thai_water_buffalo_vessel_c._1000_bce.glb', 
+  'https://trystan211.github.io/ite18_act4_n/cactus_1_downloadable.glb',  
   (gltf) => {
         centralModel = gltf.scene;
         centralModel.position.set(0, 1, 0);
